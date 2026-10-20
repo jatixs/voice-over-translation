@@ -1,3 +1,11 @@
+import { isAbortError, makeAbortError, toErrorMessage } from "#utils/errors.ts";
+import logger from "#utils/logger.ts";
+import { captureException } from "../modules/telemetry/client";
+import {
+  getAudioFailureTags,
+  type StrategyFailure,
+  selectStrategyFailuresToReport,
+} from "../modules/telemetry/context";
 import type {
   AudioDownloadRequestOptions,
   DownloadedAudioData,
@@ -5,16 +13,42 @@ import type {
 } from "../types/audioDownloader";
 import { throwIfAborted } from "../utils/abort";
 import debug from "../utils/debug";
-import { isAbortError, makeAbortError } from "../utils/errors";
 import { EventImpl } from "../utils/eventImpl";
 
 import {
   type AvailableAudioDownloadType,
+  SABR_STRATEGY,
   strategies,
   WEB_ABR_STRATEGY,
   WEB_MSE_PROXY_STRATEGY,
 } from "./strategies";
 import type { AudioChunk } from "./strategies/audioChunks";
+
+// Not keyed by video: a broken strategy affects every video, and one warning
+// per strategy and outcome keeps the session event budget for other errors.
+function reportStrategyFailures(
+  failures: StrategyFailure[],
+  downloadSucceeded: boolean,
+): void {
+  for (const { strategy, error, recovered } of selectStrategyFailuresToReport(
+    failures,
+    downloadSucceeded,
+  )) {
+    captureException(error, {
+      source: "audio",
+      operation: "audioStrategy",
+      level: "warning",
+      dedupeKey: `${strategy}:${recovered}`,
+      // Strategy errors can embed media urls and ids.
+      redactedMessage: `Audio strategy failed: ${strategy}`,
+      tags: {
+        ...getAudioFailureTags(error, "download"),
+        audio_strategy: strategy,
+        audio_recovered: String(recovered),
+      },
+    });
+  }
+}
 
 async function handleCommonAudioDownloadRequest({
   audioDownloader,
@@ -163,6 +197,19 @@ async function acquireAudioDownloadSlot(
   return resolveOwn;
 }
 
+type AudioDownloaderEventMap = {
+  downloadedAudio: [translationId: string, data: DownloadedAudioData];
+  downloadedPartialAudio: [
+    translationId: string,
+    data: DownloadedPartialAudioData,
+  ];
+  downloadAudioError: [
+    translationId: string,
+    videoId: string,
+    signInSuggested: boolean,
+  ];
+};
+
 export class AudioDownloader {
   // Only the most recent completed download is kept so a failed upload can
   // resume the same video without re-downloading. Completing a different
@@ -179,11 +226,19 @@ export class AudioDownloader {
   onDownloadedPartialAudio = new EventImpl<
     [string, DownloadedPartialAudioData]
   >();
-  onDownloadAudioError = new EventImpl<[string, string]>();
+  onDownloadAudioError = new EventImpl<[string, string, boolean]>();
+
+  private readonly events: {
+    [K in keyof AudioDownloaderEventMap]: EventImpl<AudioDownloaderEventMap[K]>;
+  } = {
+    downloadedAudio: this.onDownloadedAudio,
+    downloadedPartialAudio: this.onDownloadedPartialAudio,
+    downloadAudioError: this.onDownloadAudioError,
+  };
 
   strategy: AvailableAudioDownloadType;
 
-  constructor(strategy: AvailableAudioDownloadType = WEB_ABR_STRATEGY) {
+  constructor(strategy: AvailableAudioDownloadType = "auto") {
     this.strategy = strategy;
     this.onDownloadedPartialAudio.addListener((_translationId, data) => {
       const chunks = this.collectingChunks.get(data.videoId);
@@ -201,7 +256,7 @@ export class AudioDownloader {
           version: data.version,
         };
         this.collectingChunks.delete(data.videoId);
-        debug.log("[VOT][AudioDownload] prepared audio cached for retry", {
+        debug.log("[AudioDownload] prepared audio cached for retry", {
           videoId: data.videoId,
           chunks: data.amount,
         });
@@ -226,7 +281,7 @@ export class AudioDownloader {
   ): Promise<boolean> {
     const cached = this.completedAudioCache;
     if (cached?.videoId !== videoId) return false;
-    debug.log("[VOT][AudioDownload] replaying cached prepared audio", {
+    debug.log("[AudioDownload] replaying cached prepared audio", {
       videoId,
       chunks: cached.chunks.length,
     });
@@ -264,10 +319,10 @@ export class AudioDownloader {
         });
         return;
       }
-      debug.error("Audio downloader. All audio download strategies failed", {
+      logger.error("Audio downloader. All audio download strategies failed", {
         videoId,
       });
-      this.onDownloadAudioError.dispatch(translationId, videoId);
+      this.onDownloadAudioError.dispatch(translationId, videoId, false);
       return;
     }
 
@@ -283,9 +338,10 @@ export class AudioDownloader {
       collecting = [];
       this.collectingChunks.set(videoId, collecting);
       const attempts: AvailableAudioDownloadType[] =
-        this.strategy === WEB_ABR_STRATEGY
-          ? [WEB_ABR_STRATEGY, WEB_MSE_PROXY_STRATEGY]
+        this.strategy === "auto"
+          ? [SABR_STRATEGY, WEB_ABR_STRATEGY, WEB_MSE_PROXY_STRATEGY]
           : [this.strategy];
+      const failures: StrategyFailure[] = [];
       for (const attemptedStrategy of attempts) {
         try {
           await handleCommonAudioDownloadRequest({
@@ -296,11 +352,12 @@ export class AudioDownloader {
             signal,
             sourceLanguage,
           });
-          debug.log("Audio downloader. Audio download finished", {
+          logger.log("Audio downloader. Audio download finished", {
             videoId,
             sourceLanguage,
             audioDownloadType: attemptedStrategy,
           });
+          reportStrategyFailures(failures, true);
           return;
         } catch (error) {
           if (signal.aborted || isAbortError(error)) {
@@ -310,18 +367,40 @@ export class AudioDownloader {
             });
             return;
           }
-          debug.error("Audio downloader. Strategy failed", {
+          if (
+            attemptedStrategy === WEB_ABR_STRATEGY &&
+            error instanceof Error &&
+            error.message.includes("YOUTUBE_SIGN_IN_SUGGESTED")
+          ) {
+            this.onDownloadAudioError.dispatch(translationId, videoId, true);
+            return;
+          }
+          failures.push({ strategy: attemptedStrategy, error });
+          logger.error("Audio downloader. Strategy failed", {
             videoId,
             audioDownloadType: attemptedStrategy,
-            error: error instanceof Error ? error.message : String(error),
+            error: toErrorMessage(error),
           });
         }
       }
 
-      debug.error("Audio downloader. All audio download strategies failed", {
+      logger.error("Audio downloader. All audio download strategies failed", {
         videoId,
       });
-      this.onDownloadAudioError.dispatch(translationId, videoId);
+      const lastError = failures.at(-1)?.error;
+      reportStrategyFailures(failures, false);
+      captureException(lastError, {
+        source: "audio",
+        operation: "downloadSourceAudio",
+        dedupeKey: videoId,
+        // Strategy errors can embed media urls and ids.
+        redactedMessage: "All audio download strategies failed",
+        tags: {
+          ...getAudioFailureTags(lastError, "download"),
+          audio_strategies: attempts.join(","),
+        },
+      });
+      this.onDownloadAudioError.dispatch(translationId, videoId, false);
     } finally {
       if (collecting && this.collectingChunks.get(videoId) === collecting) {
         this.collectingChunks.delete(videoId);
@@ -340,24 +419,17 @@ export class AudioDownloader {
   ): this;
   addEventListener(
     type: "downloadAudioError",
-    listener: (translationId: string, videoId: string) => void,
+    listener: (
+      translationId: string,
+      videoId: string,
+      signInSuggested: boolean,
+    ) => void,
   ): this;
   addEventListener(
     type: "downloadedAudio" | "downloadedPartialAudio" | "downloadAudioError",
     listener: (...data: any[]) => void,
   ): this {
-    switch (type) {
-      case "downloadedAudio":
-        this.onDownloadedAudio.addListener(listener);
-        break;
-      case "downloadedPartialAudio":
-        this.onDownloadedPartialAudio.addListener(listener);
-        break;
-      case "downloadAudioError":
-        this.onDownloadAudioError.addListener(listener);
-        break;
-    }
-
+    this.events[type].addListener(listener);
     return this;
   }
 
@@ -371,24 +443,17 @@ export class AudioDownloader {
   ): this;
   removeEventListener(
     type: "downloadAudioError",
-    listener: (translationId: string, videoId: string) => void,
+    listener: (
+      translationId: string,
+      videoId: string,
+      signInSuggested: boolean,
+    ) => void,
   ): this;
   removeEventListener(
     type: "downloadedAudio" | "downloadedPartialAudio" | "downloadAudioError",
     listener: (...data: any[]) => void,
   ): this {
-    switch (type) {
-      case "downloadedAudio":
-        this.onDownloadedAudio.removeListener(listener);
-        break;
-      case "downloadedPartialAudio":
-        this.onDownloadedPartialAudio.removeListener(listener);
-        break;
-      case "downloadAudioError":
-        this.onDownloadAudioError.removeListener(listener);
-        break;
-    }
-
+    this.events[type].removeListener(listener);
     return this;
   }
 }

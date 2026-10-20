@@ -36,7 +36,6 @@
 - `invidious.nerdvpn.de`
 - `invidious.protokolla.fi`
 - `invidious.materialio.us`
-- `iv.melmac.space`
 
 Доступные пути:
 
@@ -174,16 +173,6 @@
 Доступные (под)домены:
 
 - `proxitok.pabloferreiro.es`
-- `proxitok.pussthecat.org`
-- `tok.habedieeh.re`
-- `proxitok.esmailelbob.xyz`
-- `proxitok.privacydev.net`
-- `tok.artemislena.eu`
-- `tok.adminforge.de`
-- `tt.vern.cc`
-- `cringe.whatever.social`
-- `proxitok.lunar.icu`
-- `proxitok.privacy.com.de`
 
 Доступные пути:
 
@@ -309,6 +298,16 @@
 
 - /video/VIDEO_ID
 - /videos/VIDEO_ID
+
+## Joidatabase
+
+Статус: [✅] Работает
+
+Доступные (под)домены:
+
+- `s1.the-joi-database.com`
+- `the-joi-database.com`
+- `www.the-joi-database.com`
 
 ## Picarto
 
@@ -451,6 +450,12 @@
 
 - `my.mail.ru`
 
+Доступные пути:
+
+- /v/NICKNAME/video/...
+- /mail/NICKNAME/video/...
+- video/embed/VIDEO_ID
+
 ## Bitchute
 
 Статус: [✅] Работает
@@ -584,6 +589,10 @@
 
 - `ok.ru`
 
+Доступные пути:
+
+- /video/VIDEO_ID
+
 ## Google Drive
 
 Статус: [✅] Работает
@@ -608,7 +617,6 @@
 
 - `banned.video`
 - `www.banned.video`
-- `madmaxworld.tv`
 
 Доступные пути:
 
@@ -804,6 +812,10 @@
 - `coursehunter.net`
 - `coursetrain.net`
 
+Доступные пути:
+
+- /course/COURSE_ID
+
 ## Sap
 
 Статус: [✅] Работает
@@ -902,23 +914,6 @@
 Ограничения:
 
 - Для гарантированной работы скрипта необходимо [включить настройку "Обход Media CSP"](https://github.com/ilyhalight/voice-over-translation/wiki/%5BRU%5D-FAQ) в расширение или удалить CSP другим способом
-
-## Incestflix
-
-Статус: [✅] Работает
-
-Доступные (под)домены:
-
-- `incestflix.net`
-- `incestflix.to`
-- `incestflix.com`
-- `www.incestflix.net`
-- `www.incestflix.to`
-- `www.incestflix.com`
-
-Доступные пути:
-
-- /watch/VIDEO_ID
 
 ## Dzen
 
@@ -1086,6 +1081,18 @@
 
 - /f/VIDEO_ID
 
+## Kinopoisk
+
+Статус: [✅] Работает
+
+Доступные (под)домены:
+
+- `kinopoisk.ru`
+
+Ограничения:
+
+- Для гарантированной работы скрипта необходимо [включить настройку "Обход Media CSP"](https://github.com/ilyhalight/voice-over-translation/wiki/%5BRU%5D-FAQ) в расширение или удалить CSP другим способом
+
 ## Imdb
 
 Статус: [✅] Работает
@@ -1153,6 +1160,7 @@
 Доступные пути:
 
 - /content/i2cs/*
+- /authoring-resources/*
 
 ## Mediafile
 
@@ -1171,6 +1179,26 @@
 
 - `skilljar.com`
 
+## Dropout
+
+Статус: [✅] Работает
+
+Доступные (под)домены:
+
+- `watch.dropout.tv`
+
+Ограничения:
+
+- Для гарантированной работы скрипта необходимо [включить настройку "Обход Media CSP"](https://github.com/ilyhalight/voice-over-translation/wiki/%5BRU%5D-FAQ) в расширение или удалить CSP другим способом
+
+## Wistia
+
+Статус: [✅] Работает
+
+Доступные (под)домены:
+
+- `fast.wistia.net`
+
 ## Direct link to MP4/WEBM
 
 Статус: [✅] Работает
@@ -1178,3 +1206,12 @@
 Доступные (под)домены:
 
 - `any`
+
+Доступные пути:
+
+- /*.mp4
+- /*.webm
+
+Ограничения:
+
+- Нельзя переводить локальные видео

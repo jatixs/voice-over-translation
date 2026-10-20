@@ -14,9 +14,8 @@ Object.defineProperty(globalThis, "localStorage", {
 const { VOTTranslationHandler } = await import(
   "../src/core/translationHandler"
 );
-const { strategies, WEB_ABR_STRATEGY, WEB_MSE_PROXY_STRATEGY } = await import(
-  "../src/audioDownloader/strategies/index"
-);
+const { strategies, SABR_STRATEGY, WEB_ABR_STRATEGY, WEB_MSE_PROXY_STRATEGY } =
+  await import("../src/audioDownloader/strategies/index");
 
 const tick = (ms = 10) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -41,6 +40,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
 
     type Strategy = (typeof strategies)[keyof typeof strategies];
     const table = strategies as unknown as Record<string, Strategy>;
+    const prevSabr = table[SABR_STRATEGY];
     const prevAbr = table[WEB_ABR_STRATEGY];
     const prevMse = table[WEB_MSE_PROXY_STRATEGY];
 
@@ -50,6 +50,9 @@ describe("fatal audio upload failure keeps preparing source", () => {
     let producerSignal: AbortSignal | null = null;
     const producerDone = deferred<void>();
 
+    table[SABR_STRATEGY] = async () => {
+      throw new Error("sabr unavailable");
+    };
     table[WEB_ABR_STRATEGY] = async (options: {
       videoId: string;
       signal: AbortSignal;
@@ -103,6 +106,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       getRequestLangForTranslation: () => "en",
       isLivelyVoiceAllowed: () => false,
       isYouTubeHosts: () => true,
+      ensureProxySettingsResolved: async () => undefined,
       updateTranslationErrorMsg: async (message: unknown) => {
         errorArgs.push(message);
       },
@@ -150,6 +154,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       expect(external.signal.aborted).toBe(false);
     } finally {
       handlerCtor.AUDIO_UPLOAD_RETRY_DELAY_MS = prevDelay;
+      table[SABR_STRATEGY] = prevSabr;
       table[WEB_ABR_STRATEGY] = prevAbr;
       table[WEB_MSE_PROXY_STRATEGY] = prevMse;
     }
@@ -243,9 +248,13 @@ describe("fatal audio upload failure keeps preparing source", () => {
   test("external abort clears download waiters and resets the run", async () => {
     type Strategy = (typeof strategies)[keyof typeof strategies];
     const table = strategies as unknown as Record<string, Strategy>;
+    const prevSabr = table[SABR_STRATEGY];
     const prevAbr = table[WEB_ABR_STRATEGY];
     let producerSignal: AbortSignal | null = null;
 
+    table[SABR_STRATEGY] = async () => {
+      throw new Error("sabr unavailable");
+    };
     table[WEB_ABR_STRATEGY] = async (options: {
       videoId: string;
       signal: AbortSignal;
@@ -283,6 +292,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       getRequestLangForTranslation: () => "en",
       isLivelyVoiceAllowed: () => false,
       isYouTubeHosts: () => true,
+      ensureProxySettingsResolved: async () => undefined,
       updateTranslationErrorMsg: async () => undefined,
       hadAsyncWait: false,
       notifier: { translationFailed: () => undefined },
@@ -309,6 +319,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       expect(handler.downloading).toBe(false);
       expect(handler.downloadSettlers.size).toBe(0);
     } finally {
+      table[SABR_STRATEGY] = prevSabr;
       table[WEB_ABR_STRATEGY] = prevAbr;
     }
   });
@@ -322,6 +333,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
 
     type Strategy = (typeof strategies)[keyof typeof strategies];
     const table = strategies as unknown as Record<string, Strategy>;
+    const prevSabr = table[SABR_STRATEGY];
     const prevAbr = table[WEB_ABR_STRATEGY];
     const prevMse = table[WEB_MSE_PROXY_STRATEGY];
 
@@ -337,6 +349,9 @@ describe("fatal audio upload failure keeps preparing source", () => {
       fileId: string;
     }[] = [];
 
+    table[SABR_STRATEGY] = async () => {
+      throw new Error("sabr unavailable");
+    };
     table[WEB_ABR_STRATEGY] = async () => {
       strategyCalls += 1;
       return {
@@ -410,6 +425,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       getRequestLangForTranslation: () => "en",
       isLivelyVoiceAllowed: () => false,
       isYouTubeHosts: () => true,
+      ensureProxySettingsResolved: async () => undefined,
       updateTranslationErrorMsg: async () => undefined,
       hadAsyncWait: false,
       notifier: { translationFailed: () => undefined },
@@ -468,6 +484,7 @@ describe("fatal audio upload failure keeps preparing source", () => {
       expect((handler as any).audioDownloader.completedAudioCache).toBeNull();
     } finally {
       handlerCtor.AUDIO_UPLOAD_RETRY_DELAY_MS = prevDelay;
+      table[SABR_STRATEGY] = prevSabr;
       table[WEB_ABR_STRATEGY] = prevAbr;
       table[WEB_MSE_PROXY_STRATEGY] = prevMse;
     }

@@ -1,10 +1,10 @@
 {
   "name": "[VOT] - Voice Over Translation",
   "description": "Watch videos in other languages with voice-over translation and subtitles in any browser",
-  "version": "1.11.15",
+  "version": "1.12.1",
   "author": "Toil, SashaXser, MrSoczekXD, mynovelhost, sodapng",
   "namespace": "vot",
-  "icon": "https://translate.yandex.ru/icons/favicon.ico",
+  "icon": "https://raw.githubusercontent.com/ilyhalight/voice-over-translation/dev/src/extension/icons/icon-128.png",
   "match": [
     "*://*.youtube.com/*",
     "*://*.youtube-nocookie.com/*",
@@ -100,7 +100,6 @@
     "*://*.bunkr.cat/*",
     "*://*.bunkr.media/*",
     "*://*.bunkr.red/*",
-    "*://*.bunkr.site/*",
     "*://*.bunkr.ws/*",
     "*://*.bunkr.org/*",
     "*://*.bunkr.sk/*",
@@ -119,7 +118,6 @@
     "*://*.bunkr.ac/*",
     "*://*.bunkr.ax/*",
     "*://web.telegram.org/k/*",
-    "*://rust-server-531j.onrender.com/*",
     "*://mylearn.oracle.com/*",
     "*://learn.deeplearning.ai/*",
     "*://learn-staging.deeplearning.ai/*",
@@ -138,11 +136,15 @@
     "*://projector.datacamp.com/*",
     "*://hot.noodlemagazine.com/*",
     "*://fast.wistia.net/*",
+    "*://oauth.yandex.ru/verification_code*",
     "*://*.the-joi-database.com/*",
+    "*://*.vhx.tv/*",
+    "*://*.boomio-cdn.com/*",
+    "*://*.kinopoisk.ru/*",
     "*://*/*.mp4*",
     "*://*/*.webm*"
   ],
-  "grant": ["window.focus"],
+  "grant": ["window.focus", "GM.xmlHttpRequest"],
   "exclude": [
     "file://*/*.mp4*",
     "file://*/*.webm*",
@@ -153,6 +155,8 @@
   ],
   "connect": [
     "yandex.ru",
+    "oauth.yandex.ru",
+    "login.yandex.ru",
     "disk.yandex.kz",
     "disk.yandex.com",
     "disk.yandex.com.am",
@@ -174,6 +178,7 @@
     "timeweb.cloud",
     "raw.githubusercontent.com",
     "vimeo.com",
+    "vhx.tv",
     "toil.cc",
     "onrender.com",
     "workers.dev",
@@ -181,6 +186,12 @@
     "cloudflare-dns.com",
     "porntn.com",
     "youtube.com",
-    "googlevideo.com"
+    "googlevideo.com",
+    "fonts.google.com",
+    "fonts.googleapis.com",
+    "vtrans.eu.cc",
+    "vot-worker.vtrans.eu.cc",
+    "ingest.nirel.cc",
+    "kinopoisk.ru"
   ]
 }
